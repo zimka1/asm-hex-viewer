@@ -35,7 +35,9 @@ parse_args:
 
 process_filename:
     call copy_filename  ; Copy the filename
+    push si
     call open_and_read_file  ; Open and read the file
+    pop si
     jmp parse_args      ; Look for the next argument
 
 exit_program:
@@ -90,16 +92,22 @@ file_open:
     mov [file_handle], ax  ; Store file handle
 
 read_file:
-    mov bx, [file_handle]  ; Load file handle
-    mov ah, 3Fh            ; Read function
-    mov cx, 1              ; Read 1 byte
-    mov dx, offset save_data
-    int 21h                ; Call DOS
+    mov ah, 3Fh                ; Функция чтения
+    lea dx, [save_data]       ; Адрес буфера
+    mov bx, [file_handle]      ; Загружаем дескриптор файла
+    mov cx, 128               ; Читаем 128 байт
+    int 21h              ; Call DOS
+    jc error_handler
 
-    test ax, ax            ; Check if end of file is reached
-    jz close_file          ; If yes, close the file
+    cmp ax, 0                  ; AX == 0 (конец файла)?
+    je close_file              ; Если да, закрываем файл
 
-    mov al, [save_data]
+
+    lea si, [save_data]  ; Загружаем адрес буфера
+    mov cx, ax         ; Количество прочитанных байтов
+
+read_loop:
+    mov al, [si]       ; Читаем байт
 
     cmp al, 0Ah ; If newline character, print offset
     je print_offset
@@ -113,11 +121,16 @@ read_file:
     print_space
 
 continue_without_space:
+
     pop ax
 
     call convert_to_hex
 
-    jmp read_file          ; Continue reading
+    inc si
+
+    loop read_loop
+
+    jmp read_file
 
 
 print_offset:
@@ -126,8 +139,8 @@ print_offset:
     mov ax, [file_offset]
     call convert_to_hex
     pop ax
-    jmp read_file          ; Continue reading
-
+    inc si
+    loop read_loop
 
 convert_to_hex:
     push ax
@@ -180,7 +193,7 @@ filename db 64 dup(0)
 msg_error db 'Error opening file', 0Dh, 0Ah, '$'
 file_handle dw ?
 file_offset dw 0
-save_data db 16 dup(0)
+save_data db 128 dup(0)
 help_message db 'Print the content of the input in hexadecimal format.', 0Dh, 0Ah
 db 'At the beginning of each line, print the offset', 0Dh, 0Ah
 db 'of the first displayed value from the start.', 0Dh, 0Ah, '$'

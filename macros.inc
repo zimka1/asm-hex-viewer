@@ -30,4 +30,5 @@ check_help_info MACRO
     inc si
     cmp byte ptr es:[si], 'h'  ; Check if it's the '-h' flag
     jne parse_args
+    
 ENDM
