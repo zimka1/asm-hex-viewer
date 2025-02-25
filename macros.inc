@@ -1,3 +1,12 @@
+clean_terminal MACRO
+    mov ah, 06h
+    mov al, 00h 
+    mov bh, 07h 
+    mov cx, 0
+    mov dx, 184fh 
+    int 10h         
+ENDM
+
 print_space MACRO
     mov dl, ' '
     mov ah, 02h  
@@ -32,3 +41,23 @@ check_help_info MACRO
     jne parse_args
     
 ENDM
+
+
+page_monitoring MACRO
+    cmp word ptr [characters_in_line], 75
+    jbe continue_without_space_or_new_page
+    print_line_feed
+    mov word ptr [characters_in_line], 0
+    inc word ptr [number_of_lines]
+    cmp word ptr [number_of_lines], 20
+    jb continue_without_space_or_new_page
+
+new_page:
+    mov word ptr [characters_in_line], 0
+    mov word ptr [number_of_lines], 0
+    print_line_feed
+    print_text msg_wait
+    mov ah, 00h
+    int 16h  ; wait_for_key
+ENDM
+    

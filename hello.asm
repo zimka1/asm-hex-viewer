@@ -10,6 +10,8 @@ START:
     mov ax, DGROUP
     mov ds, ax
 
+    clean_terminal
+
     mov ah, 62h         ; Get PSP (Program Segment Prefix)
     int 21h
     mov es, bx          ; Store PSP in ES
@@ -31,6 +33,8 @@ parse_args:
 
     ; Display help message
     print_text help_message
+    inc word ptr [number_of_lines]
+
     
     inc si
     jmp parse_args   ; Continue processing the remaining arguments
@@ -81,6 +85,9 @@ open_and_read_file:
 
     print_line_feed
 
+    inc word ptr [number_of_lines]
+
+
     ; Open the file
     mov ah, 3Dh
     mov al, 0           ; Open for reading
@@ -99,51 +106,55 @@ read_file:
     mov bx, [file_handle]      ; Загружаем дескриптор файла
     mov cx, 128               ; Читаем 128 байт
     int 21h              ; Call DOS
-    jc error_handler
+    jnc without_reading_problem
+    jmp far ptr error_handler
 
+without_reading_problem:
     cmp ax, 0                  ; AX == 0 (конец файла)?
-    je close_file              ; Если да, закрываем файл
+    jne it_isnt_end
+    jmp far ptr close_file             ; Если да, закрываем файл
 
-
+it_isnt_end:
     lea si, [save_data]  ; Загружаем адрес буфера
     mov cx, ax         ; Количество прочитанных байтов
 
 read_loop:
     mov al, [si]       ; Читаем байт
-
     cmp al, 0Ah ; If newline character, print offset
-    je print_offset
-
+    jne not_newline
+    call print_offset
+    dec cx
+    jnz read_loop
+    jmp far ptr close_file
+not_newline:
     inc word ptr [file_offset] ; Increase the read byte count
-
     push ax ; Save AX on stack to avoid corruption when printing space
-
     cmp word ptr [file_offset], 1
-    je continue_without_space ;
+    je continue_without_space_or_new_page
     print_space
+    inc word ptr [characters_in_line]
+    page_monitoring
 
-continue_without_space:
 
+continue_without_space_or_new_page:
+    add word ptr [characters_in_line], 2
     pop ax
-
     call print_hex
-
     inc si
-
     loop read_loop
-
     jmp read_file
 
 
 print_offset:
     print_line_feed
+    mov word ptr [characters_in_line], 0
+    inc word ptr [number_of_lines]
     push ax
     mov ax, [file_offset]
     call print_hex
     pop ax
     inc si
-    loop read_loop
-
+    ret
 
 close_file:
     ; Close the file
@@ -164,11 +175,16 @@ filename db 64 dup(0)
 msg_error db 'Error opening file', 0Dh, 0Ah, '$'
 file_handle dw ?
 file_offset dw 0
+characters_in_line dw 0
+number_of_lines dw 0
 save_data db 128 dup(0)
 help_message db 'Print the content of the input in hexadecimal format.', 0Dh, 0Ah
 db 'At the beginning of each line, print the offset', 0Dh, 0Ah
 db 'of the first displayed value from the start.', 0Dh, 0Ah, '$'
+msg_wait db 'Press any key to continue...', 0Dh, 0Ah, '$'
+
 
 .stack 100h
 
 end START
+
