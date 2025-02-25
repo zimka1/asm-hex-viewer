@@ -23,20 +23,12 @@ arg_not_null:
     
 parse_args:
     call skip_spaces     ; Skip spaces before arguments
-    cmp byte ptr es:[si], 0Dh
-    je exit_program      ; If there are no more arguments, exit
-
-    cmp byte ptr es:[si], '-'  ; Check if the argument starts with '-'
-    jne process_filename
-
-    inc si
-    cmp byte ptr es:[si], 'h'  ; Check if it's the '-h' flag
-    jne parse_args
+    
+    ; Check if the argument is "-h" or there are no arguments
+    check_help_info
 
     ; Display help message
-    mov dx, offset help_message
-    mov ah, 09h
-    int 21h
+    print_text help_message
     
     inc si
     jmp parse_args   ; Continue processing the remaining arguments
@@ -74,17 +66,27 @@ copy_loop:
     inc si
     jmp copy_loop
 end_copy:
-    mov byte ptr [di], 0  ; Add null terminator at the end
+    mov byte ptr [di], '$'  ; Add end terminator at the end
     ret
 
 open_and_read_file:  
+
+    print_line_feed
+
+    print_text filename
+
+    print_line_feed
+
     ; Open the file
     mov ah, 3Dh
     mov al, 0           ; Open for reading
     mov dx, offset filename 
     int 21h
-    jc error_handler    ; Jump to error handler if an error occurs
+    jnc file_open
+    jmp far ptr error_handler ; Jump to error handler if no arguments
 
+
+file_open:
     mov [file_handle], ax  ; Store file handle
 
 read_file:
@@ -97,17 +99,20 @@ read_file:
     test ax, ax            ; Check if end of file is reached
     jz close_file          ; If yes, close the file
 
-    inc word ptr [file_offset] ; Increase the read byte count
-
     mov al, [save_data]
 
     cmp al, 0Ah ; If newline character, print offset
     je print_offset
 
+    inc word ptr [file_offset] ; Increase the read byte count
+
     push ax ; Save AX on stack to avoid corruption when printing space
 
+    cmp word ptr [file_offset], 1
+    je continue_without_space ;
     print_space
 
+continue_without_space:
     pop ax
 
     call convert_to_hex
@@ -117,10 +122,10 @@ read_file:
 
 print_offset:
     print_line_feed
-    
+    push ax
     mov ax, [file_offset]
     call convert_to_hex
-
+    pop ax
     jmp read_file          ; Continue reading
 
 
@@ -158,15 +163,14 @@ print_char:
 
 close_file:
     ; Close the file
+    mov word ptr [file_offset], 0
     mov ah, 3Eh
     mov bx, [file_handle]
     int 21h
     ret
 
 error_handler:
-    mov dx, offset msg_error
-    mov ah, 9
-    int 21h
+    print_text msg_error
     mov ax, 4C10h
     int 21h
 
