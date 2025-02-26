@@ -1,3 +1,33 @@
+; ==============================================================================================
+; ==============================================================================================
+; 
+; Task:     Number 5
+; Author:   Aliaksei Zimnitski
+;
+; Task (10 points):     Print the input content in hexadecimal format. 
+;                       At the beginning of each line, print the offset 
+;                       of the first value being printed from the beginning.
+; Tasks (5 points):
+;                       Plus 2 points can be earned if the task is implemented 
+;                        as an external procedure (compiled separately and linked 
+;                        to the final program).
+;                       Plus 2 points: If multiple input files can be specified.
+;                       Plus 1 point: When the '-p' switch is entered, the output 
+;                        should be paginated, meaning after the screen is filled, 
+;                        the program will wait for a key press.
+; Bonuses (3 points):
+;                       Plus 1 point: During pagination, the current date and time 
+;                        should always be displayed.
+;                       Plus 1 point can be earned for (good) comments or documentation 
+;                        in English.
+; Date:     26.02.2025
+;
+; Academic year:    2
+; Semester:         4
+; Field of study:   informatika
+;
+; ==============================================================================================
+; ==============================================================================================
 INCLUDE macros.inc
 
 .8086
@@ -9,79 +39,97 @@ EXTRN print_date:near
 EXTRN print_dec:near
 
 START:
-    mov ax, DGROUP
-    mov ds, ax
+    mov ax, @data                               ; Load data segment address into AX
+    mov ds, ax                                  ; Move AX into DS to set the data segment
 
-    clean_terminal
+    clean_terminal                              ; Call a procedure to clean the terminal screen
+
+; ==============================================================================================
+; ==============================================================================================
+;
+; This code fragment processes command-line arguments, which are retrieved from 
+; the Program Segment Prefix (PSP), where flags come first, followed by filenames. 
+; The program first checks the flags (e.g., -h for help or -p for paging). Then, 
+; for each filename, the program copies it into a buffer, opens the file, reads its content, 
+; and processes it. Only after completing the processing of the current file does the program 
+; move on to the next file in the argument list.
+;
+; ==============================================================================================
+; ==============================================================================================
+
+
 
     ; Get PSP (Program Segment Prefix)
-    mov ah, 62h
-    int 21h
-    mov es, bx
+    mov ah, 62h                                 ; DOS function: Get Program Segment Prefix (PSP)
+    int 21h                                     ; Call DOS interrupt 21h
+    mov es, bx                                  ; Store the value of PSP segment into ES
 
     ; Get the length of command-line arguments
-    mov al, es:80h
-    or al, al
-    jnz arg_not_null
-    jmp error_handler   ; Error if no arguments are provided
+    mov al, es:80h                              ; Load the length of command-line arguments into AL
+    or al, al                                   ; Check if AL is zero (no arguments provided)
+    jnz arg_not_null                            ; If arguments exist, jump to arg_not_null
+    jmp error_handler                           ; If no arguments, jump to error handler
 
 arg_not_null:
-    mov cx, ax          ; CX = length of the argument string
-    mov si, 81h         ; Start of arguments
-    
+    mov cx, ax                                  ; Store the length of the argument string in CX
+    mov si, 81h                                 ; Set SI to the start of arguments (in the PSP)
+
 parse_args:
-    call skip_spaces     ; Skip leading spaces
-    
-    ; Check if the "-h" (help) or the "-p"(paging) argument is present
-    check_flags
+    call skip_spaces                            ; Call procedure to skip leading spaces
+
+    check_flags                                 ; Check if the "-h" (help) or "-p" (paging) argument is present
 
 print_help_message:
-    print_text help_message
-    make_new_page
+    print_text help_message                     ; Print the help message
+    make_new_page                               ; Make a new page (for paging)
     ret
 
 set_paging_flag:
-    mov byte ptr paging_flag, 1
+    mov byte ptr paging_flag, 1                 ; Set the paging flag to 1
     ret
 
-
 process_filename:
-    call copy_filename      ; Copy the filename from arguments
-    push si
-    call open_and_read_file ; Open and read the file
-    pop si
-    jmp parse_args          ; Continue parsing other arguments
+    call copy_filename                          ; Copy the filename from arguments to filename buffer
+    push si                                     ; Push SI to stack to preserve it
+    call open_and_read_file                     ; Open and read the file
+    pop si                                      ; Restore SI from stack
+    jmp parse_args                              ; Continue parsing other arguments
 
 exit_program:
-    mov ah, 4Ch
-    int 21h                 ; Terminate program
+    mov ah, 4Ch                                 ; DOS function to terminate the program
+    int 21h                                     ; Call DOS interrupt to exit the program
 
 skip_spaces:
     ; Skips spaces in the argument string
-    mov al, es:[si]
-    cmp al, 32
-    jne end_skip_spaces
-    inc si
-    jmp skip_spaces
+    mov al, es:[si]                             ; Load the current character into AL
+    cmp al, 32                                  ; Compare it with the ASCII value of space (32)
+    jne end_skip_spaces                         ; If it's not space, exit the loop
+    inc si                                      ; Move to the next character
+    jmp skip_spaces                             ; Repeat the process
+
 end_skip_spaces:
-    ret
+    ret                                         ; Return from skip_spaces procedure
 
 copy_filename:
     ; Copies the filename (stops at space or end of line)
-    mov di, offset filename
+    mov di, offset filename                     ; Set DI to the beginning of the filename buffer
 copy_loop:
-    mov al, es:[si]
-    cmp al, 32          ; Stop copying at space
-    je end_copy
-    cmp al, 0Dh         ; Stop copying at Enter (end of arguments)
-    je end_copy
-    mov [di], al        ; Store the character in filename buffer
-    inc di
-    inc si
-    jmp copy_loop
+    mov al, es:[si]                             ; Load the current character into AL
+    cmp al, 32                                  ; Compare it with space (ASCII 32)
+    je end_copy                                 ; If space is encountered, stop copying
+    cmp al, 0Dh                                 ; Compare it with Enter (ASCII 0Dh)
+    je end_copy                                 ; If Enter is encountered, stop copying
+    mov [di], al                                ; Store the character in the filename buffer
+    inc di                                      ; Move to the next position in the filename buffer
+    inc si                                      ; Move to the next character in the argument string
+    jmp copy_loop                               ; Repeat copying
+
 end_copy:
-    mov byte ptr [di], '$'  ; Add string terminator
-    ret
+    mov byte ptr [di], '$'                      ; Add string terminator ('$') to mark the end of the filename
+    ret                                         ; Return from copy_filename procedure
+
+
+
 
 open_and_read_file:  
     print_line_feed_without_offset
@@ -129,13 +177,18 @@ read_loop:
     jne not_newline
     cmp byte ptr paging_flag, 0 ; If paging flag is 0, then we dont need pages
     je without_new_page
-    cmp word ptr [number_of_lines], 21 ; Check if page break is needed
+    cmp word ptr [number_of_lines], 20 ; Check if page break is needed
     jb without_new_page
+    print_line_feed_without_offset
+    print_text msg_filename
+    print_text filename
     make_new_page
 without_new_page:
     print_line_feed
     dec cx
-    jnz read_loop
+    jz end_loop
+    jmp far ptr read_loop
+end_loop:
     jmp close_file
 
 not_newline:
@@ -192,6 +245,7 @@ error_handler:
 .data   
 filename db 64 dup(0)
 msg_error db 'Error opening file', 0Dh, 0Ah, '$'
+msg_filename db 'Path: ', '$'
 file_handle dw ?
 file_offset dw 0
 characters_in_line dw 0

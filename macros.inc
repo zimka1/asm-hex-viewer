@@ -48,8 +48,9 @@ check_flags MACRO
 
 start_check_flags:
     cmp byte ptr es:[si], '-'  ; Check if the argument starts with '-'
-    jne process_filename
-
+    je check_letter
+    jmp far ptr process_filename
+check_letter:
     inc si
     cmp byte ptr es:[si], 'h'  ; Check if it's the '-h' flag
     jne continue_check_flags
@@ -88,7 +89,7 @@ check_flag:
     cmp byte ptr paging_flag, 0 ; If paging flag is 0, then we dont need pages
     je continue_only_with_line_feed
 
-    cmp word ptr [number_of_lines], 21  ; If near page limit, handle accordingly
+    cmp word ptr [number_of_lines], 20  ; If near page limit, handle accordingly
     jb continue_only_with_line_feed
     jmp continue_with_new_page_and_new_line
 
@@ -98,6 +99,9 @@ continue_only_with_line_feed:  ; Move to a new line and continue
     jmp continue_without_space_or_new_page
 
 continue_with_new_page_and_new_line:  ; Create a new page before the next line
+    print_line_feed_without_offset
+    print_text msg_filename
+    print_text filename
     make_new_page
     print_line_feed
     print_space
