@@ -33,8 +33,6 @@ parse_args:
 
     ; Display help message
     print_text help_message
-    inc word ptr [number_of_lines]
-
     
     inc si
     jmp parse_args   ; Continue processing the remaining arguments
@@ -79,13 +77,13 @@ end_copy:
 
 open_and_read_file:  
 
-    print_line_feed
+    print_line_feed_without_offset
 
     print_text filename
 
-    print_line_feed
-
     inc word ptr [number_of_lines]
+
+    print_line_feed_without_offset
 
 
     ; Open the file
@@ -120,9 +118,15 @@ it_isnt_end:
 
 read_loop:
     mov al, [si]       ; Читаем байт
+    cmp al, 00h
+    je read_file
     cmp al, 0Ah ; If newline character, print offset
     jne not_newline
-    call print_offset
+    cmp word ptr [number_of_lines], 22 ; Если перенос строки прям перед новой страницей, то мы перенесем строку на следующую страницу
+    jb without_new_page
+    make_new_page
+without_new_page:
+    print_line_feed
     dec cx
     jnz read_loop
     jmp far ptr close_file
@@ -130,10 +134,13 @@ not_newline:
     inc word ptr [file_offset] ; Increase the read byte count
     push ax ; Save AX on stack to avoid corruption when printing space
     cmp word ptr [file_offset], 1
-    je continue_without_space_or_new_page
-    print_space
+    jne continue_with_space
+    jmp far ptr continue_without_space_or_new_page
+continue_with_space:
     inc word ptr [characters_in_line]
+    print_space
     page_monitoring
+
 
 
 continue_without_space_or_new_page:
@@ -141,20 +148,47 @@ continue_without_space_or_new_page:
     pop ax
     call print_hex
     inc si
-    loop read_loop
-    jmp read_file
+    dec cx
+    jz read_more_bytes
+    jmp far ptr read_loop
+read_more_bytes:
+    jmp far ptr read_file
 
 
 print_offset:
-    print_line_feed
-    mov word ptr [characters_in_line], 0
-    inc word ptr [number_of_lines]
     push ax
+    push bx
+    push cx
     mov ax, [file_offset]
-    call print_hex
+    call print_number
+    add word ptr [characters_in_line], cx
+    pop cx
+    pop bx
     pop ax
     inc si
     ret
+
+
+print_number:
+    mov bx, 10          ; Divider (for decimal output)
+    mov cx, 0           ; Digit counter (number of characters)
+
+convert_loop:
+    mov dx, 0           ; Clear higher part for div
+    div bx              ; AX / 10 → AX = quotient, DX = remainder
+    add dl, '0'         ; Convert remainder to ASCII character
+    push dx             ; Save digit onto the stack
+    inc cx              ; Increase digit counter
+    test ax, ax         ; Check if quotient is 0
+    jnz convert_loop    ; If not 0, continue dividing
+
+print_loop:
+    pop dx              ; Retrieve character from stack
+    mov ah, 02h         ; Function to print a character
+    int 21h             ; Print character
+    loop print_loop     ; Repeat while cx > 0
+    ret
+
 
 close_file:
     ; Close the file
