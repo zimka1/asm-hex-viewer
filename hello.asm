@@ -133,9 +133,6 @@ end_copy:
 
 open_and_read_file:  
     print_line_feed_without_offset
-    print_text filename
-    inc word ptr [number_of_lines]
-    print_line_feed_without_offset
 
     ; Open the file
     mov ah, 3Dh
@@ -179,10 +176,7 @@ read_loop:
     je without_new_page
     cmp word ptr [number_of_lines], 20 ; Check if page break is needed
     jb without_new_page
-    print_line_feed_without_offset
-    print_text msg_filename
-    print_text filename
-    make_new_page
+    make_new_page_with_file_name
 without_new_page:
     print_line_feed
     dec cx
@@ -235,6 +229,10 @@ close_file:
     mov ah, 3Eh
     mov bx, [file_handle]
     int 21h
+    cmp byte ptr [paging_flag], 0
+    je return
+    make_new_page_with_file_name
+return:
     ret
 
 error_handler:

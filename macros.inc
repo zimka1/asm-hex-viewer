@@ -124,3 +124,11 @@ make_new_page MACRO
     pop cx
     pop bx
 ENDM
+
+
+make_new_page_with_file_name MACRO
+    print_line_feed_without_offset
+    print_text msg_filename
+    print_text filename
+    make_new_page
+ENDM
