@@ -109,6 +109,7 @@ make_new_page MACRO
     mov word ptr [number_of_lines], 0
     print_line_feed_without_offset
     print_text msg_wait
+    call print_date
     mov ah, 00h
     int 16h  ; Wait for a key press
     push bx

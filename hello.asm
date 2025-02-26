@@ -5,6 +5,8 @@ INCLUDE macros.inc
 
 .code
 EXTRN print_hex:near
+EXTRN print_date:near
+EXTRN print_dec:near
 
 START:
     mov ax, DGROUP
@@ -115,6 +117,9 @@ without_reading_problem:
 it_isnt_end:
     lea si, [save_data]  ; Load buffer address
     mov cx, ax         ; Set bytes read count
+    mov di, si           ; Копируем адрес буфера в DI
+    add di, cx           ; DI = адрес конца данных
+    mov byte ptr [di], 0 ; Записываем нулевой байт
 
 read_loop:
     mov al, [si]       ; Read byte
@@ -162,7 +167,7 @@ print_offset:
     push bx
     push cx
     mov ax, [file_offset]
-    call print_number
+    call print_dec
     add word ptr [characters_in_line], cx
     pop cx
     pop bx
@@ -170,25 +175,6 @@ print_offset:
     inc si
     ret
 
-print_number:
-    mov bx, 10          ; Divider (for decimal output)
-    mov cx, 0           ; Digit counter (number of characters)
-
-convert_loop:
-    mov dx, 0           ; Clear higher part for division
-    div bx              ; AX / 10 → AX = quotient, DX = remainder
-    add dl, '0'         ; Convert remainder to ASCII character
-    push dx             ; Save digit onto the stack
-    inc cx              ; Increase digit counter
-    test ax, ax         ; Check if quotient is 0
-    jnz convert_loop    ; If not 0, continue dividing
-
-print_loop:
-    pop dx              ; Retrieve character from stack
-    mov ah, 02h         ; Function to print a character
-    int 21h             ; Print character
-    loop print_loop     ; Repeat while cx > 0
-    ret
 
 close_file:
     ; Close the file
