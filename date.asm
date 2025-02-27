@@ -6,6 +6,7 @@ PUBLIC print_date
 .code
 
 ; ==============================================================================================
+; Date and time display
 ; ==============================================================================================
 ;
 ; This code retrieves the system date and time using DOS interrupts (21h), 

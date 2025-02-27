@@ -7,6 +7,7 @@ PUBLIC print_hex
 
 
 ; ==============================================================================================
+; Conversion to hex and byte output in hexadecimal
 ; ==============================================================================================
 ;
 ; This code defines a procedure print_hex to print the hexadecimal representation of a byte. 
